@@ -2,7 +2,12 @@ const mongoose = require('mongoose')
 
 const connectDB = async () => {
   try {
-    const mongoUri = (process.env.MONGO_URI || '').replace('mongodb://localhost', 'mongodb://127.0.0.1')
+    const mongoUri = process.env.MONGO_URI
+
+    if (!mongoUri) {
+      throw new Error('MONGO_URI is not set')
+    }
+
     const conn = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 5000,
       family: 4,

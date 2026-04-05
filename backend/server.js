@@ -4,7 +4,9 @@ const cors = require('cors')
 const dotenv = require('dotenv')
 const pinoHttp = require('pino-http')
 
-dotenv.config()
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config()
+}
 const connectDB = require('./config/db')
 const { createWhiteboardSocketServer } = require('./socket/whiteboardSocket')
 const authRoutes = require('./routes/authRoutes')
