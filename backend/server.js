@@ -20,8 +20,21 @@ const {
 const app = express()
 const server = http.createServer(app)
 const PORT = process.env.PORT || 5000
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+const DEFAULT_CLIENT_ORIGIN = 'http://localhost:5173'
+const ALLOWED_ORIGINS = (process.env.CLIENT_ORIGIN || DEFAULT_CLIENT_ORIGIN)
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean)
 let isShuttingDown = false
+
+const isOriginAllowed = (origin) => {
+  if (!origin) {
+    return true
+  }
+
+  const normalizedOrigin = origin.replace(/\/$/, '')
+  return ALLOWED_ORIGINS.includes(normalizedOrigin)
+}
 
 server.on('error', (error) => {
   logger.error({ err: error, port: PORT }, 'Server listen error')
@@ -30,7 +43,13 @@ server.on('error', (error) => {
 
 app.use(
   cors({
-    origin: CLIENT_ORIGIN,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        return callback(null, true)
+      }
+
+      return callback(new Error('Not allowed by CORS'))
+    },
     credentials: true,
   })
 )
@@ -45,7 +64,13 @@ app.use('/api/auth', authRoutes)
 
 createWhiteboardSocketServer(server, {
   cors: {
-    origin: CLIENT_ORIGIN,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        return callback(null, true)
+      }
+
+      return callback(new Error('Not allowed by CORS'))
+    },
     credentials: true,
   },
 })
