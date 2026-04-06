@@ -164,6 +164,8 @@ function App() {
             <label className="room-field">
               <span>Username</span>
               <input
+                id="auth-username"
+                name="username"
                 type="text"
                 value={authForm.username}
                 onChange={handleAuthFieldChange('username')}
@@ -176,6 +178,8 @@ function App() {
           <label className="room-field">
             <span>Email</span>
             <input
+              id="auth-email"
+              name="email"
               type="email"
               value={authForm.email}
               onChange={handleAuthFieldChange('email')}
@@ -186,6 +190,8 @@ function App() {
           <label className="room-field">
             <span>Password</span>
             <input
+              id="auth-password"
+              name="password"
               type="password"
               value={authForm.password}
               onChange={handleAuthFieldChange('password')}
@@ -205,6 +211,8 @@ function App() {
         <label className="room-field">
           <span>Room ID</span>
           <input
+            id="room-id"
+            name="roomId"
             type="text"
             value={roomInput}
             onChange={(event) => setRoomInput(event.target.value)}
