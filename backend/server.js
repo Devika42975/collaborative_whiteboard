@@ -1,31 +1,25 @@
-const http = require('http')
 const express = require('express')
 const cors = require('cors')
 const dotenv = require('dotenv')
-const pinoHttp = require('pino-http')
+const connectDB = require('./config/db')
 
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config()
 }
-const connectDB = require('./config/db')
-const { createWhiteboardSocketServer } = require('./socket/whiteboardSocket')
+
 const authRoutes = require('./routes/authRoutes')
-const logger = require('./utils/logger')
-const {
-  flushStrokeBufferNow,
-  startStrokeFlushWorker,
-  stopStrokeFlushWorker,
-} = require('./workers/strokeFlushWorker')
 
 const app = express()
-const server = http.createServer(app)
 const PORT = process.env.PORT || 5000
 const DEFAULT_CLIENT_ORIGIN = 'http://localhost:5173'
-const ALLOWED_ORIGINS = (process.env.CLIENT_ORIGIN || DEFAULT_CLIENT_ORIGIN)
-  .split(',')
-  .map((origin) => origin.trim().replace(/\/$/, ''))
-  .filter(Boolean)
-let isShuttingDown = false
+const DEV_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173']
+const ALLOWED_ORIGINS = [
+  ...(process.env.CLIENT_ORIGIN || DEFAULT_CLIENT_ORIGIN)
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean),
+  ...DEV_ORIGINS,
+].filter((origin, index, list) => list.indexOf(origin) === index)
 
 const isOriginAllowed = (origin) => {
   if (!origin) {
@@ -36,91 +30,58 @@ const isOriginAllowed = (origin) => {
   return ALLOWED_ORIGINS.includes(normalizedOrigin)
 }
 
-server.on('error', (error) => {
-  logger.error({ err: error, port: PORT }, 'Server listen error')
-  process.exit(1)
-})
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      return callback(null, true)
+    }
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (isOriginAllowed(origin)) {
-        return callback(null, true)
-      }
+    return callback(new Error('Not allowed by CORS'))
+  },
+  credentials: true,
+}
 
-      return callback(new Error('Not allowed by CORS'))
-    },
-    credentials: true,
-  })
-)
-app.use(
-  pinoHttp({
-    logger,
-    genReqId: (req) => req.headers['x-request-id'] || undefined,
-  })
-)
+app.use(cors(corsOptions))
+app.options(/.*/, cors(corsOptions))
 app.use(express.json())
 app.use('/api/auth', authRoutes)
 
-createWhiteboardSocketServer(server, {
-  cors: {
-    origin: (origin, callback) => {
-      if (isOriginAllowed(origin)) {
-        return callback(null, true)
-      }
-
-      return callback(new Error('Not allowed by CORS'))
-    },
-    credentials: true,
-  },
-})
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' })
 })
+
 app.get('/', (req, res) => {
   res.send('Collaborative whiteboard backend is running')
 })
+
+const http = require('http')
+const { createWhiteboardSocketServer } = require('./socket/whiteboardSocket')
+
 const startServer = async () => {
   try {
     await connectDB()
-    startStrokeFlushWorker()
+
+    // create HTTP server using the express app
+    const server = http.createServer(app)
+
+    // attach socket.io server so /socket.io is served from the same port
+    createWhiteboardSocketServer(server, {
+      cors: {
+        origin: (origin, callback) => {
+          if (isOriginAllowed(origin)) return callback(null, true)
+          return callback(new Error('Not allowed by CORS'))
+        },
+        credentials: true,
+      },
+    })
+
     server.listen(PORT, () => {
-      logger.info({ port: PORT }, 'HTTP and Socket server listening')
+      console.log(`Server listening on port ${PORT}`)
     })
   } catch (error) {
-    logger.error({ err: error }, 'Unable to start server')
+    console.error(`Unable to start server: ${error.message}`)
     process.exit(1)
   }
 }
-
-const shutdown = async (signal) => {
-  if (isShuttingDown) {
-    return
-  }
-
-  isShuttingDown = true
-  logger.info({ signal }, 'Graceful shutdown started')
-
-  try {
-    stopStrokeFlushWorker()
-    await flushStrokeBufferNow('shutdown')
-    await new Promise((resolve) => {
-      server.close(() => resolve())
-    })
-    logger.info('Graceful shutdown completed')
-    process.exit(0)
-  } catch (error) {
-    logger.error({ err: error }, 'Graceful shutdown failed')
-    process.exit(1)
-  }
-}
-
-process.on('SIGINT', () => {
-  shutdown('SIGINT').catch((error) => logger.error({ err: error }, 'SIGINT shutdown failed'))
-})
-
-process.on('SIGTERM', () => {
-  shutdown('SIGTERM').catch((error) => logger.error({ err: error }, 'SIGTERM shutdown failed'))
-})
 
 startServer()

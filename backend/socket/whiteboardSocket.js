@@ -1,10 +1,11 @@
 const { Server } = require('socket.io')
 const Room = require('../models/Room')
 const Stroke = require('../models/Stroke')
-const User = require('../models/User')
+const User = require('../models/User') 
 const { verifyAccessToken } = require('../utils/tokenUtils')
 const logger = require('../utils/logger')
 const { enqueueStroke, getBufferedStrokesForRoom } = require('../workers/strokeFlushWorker')
+const { clearBufferedStrokesForRoom } = require('../workers/strokeFlushWorker')
 
 const MAX_POINTS_PER_STROKE = 5000
 
@@ -264,6 +265,43 @@ const createWhiteboardSocketServer = (server, options = {}) => {
       socket.to(stroke.roomId).emit('stroke:receive', message)
       callback?.({ ok: true, strokeId: stroke.strokeId })
       logger.info({ socketId: socket.id, roomId: stroke.roomId }, 'Stroke buffered and broadcast')
+    })
+
+    socket.on('board:clear', async (payload, callback) => {
+      try {
+        const roomId = socket.data.roomId || (payload && payload.roomId)
+
+        if (!roomId) {
+          callback?.({ ok: false, message: 'roomId is required' })
+          return
+        }
+
+        // ensure the room exists
+        const room = await Room.findOne({ roomId }).select('_id')
+
+        if (!room) {
+          callback?.({ ok: false, message: 'Room not found' })
+          return
+        }
+
+        // delete persisted strokes for the room
+        await Stroke.deleteMany({ room: room._id })
+
+        // clear the room's stroke references
+        await Room.findByIdAndUpdate(room._id, { $set: { strokes: [] } })
+
+        // clear buffered strokes
+        clearBufferedStrokesForRoom(roomId)
+
+        // notify all clients in the room (including sender)
+        io.to(roomId).emit('board:cleared', { roomId })
+
+        logger.info({ roomId, socketId: socket.id }, 'Board cleared')
+        callback?.({ ok: true })
+      } catch (error) {
+        logger.error({ err: error, socketId: socket.id }, 'Clear board failed')
+        callback?.({ ok: false, message: 'Unable to clear board' })
+      }
     })
 
     socket.on('disconnect', async (reason) => {

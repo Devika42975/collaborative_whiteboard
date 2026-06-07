@@ -68,6 +68,16 @@ const snapshotAndClearBuffer = () => {
   return snapshot
 }
 
+const clearBufferedStrokesForRoom = (roomId) => {
+  const roomBuffer = strokeBufferByRoom.get(roomId) || []
+  const removed = roomBuffer.length
+  if (removed) {
+    strokeBufferByRoom.delete(roomId)
+    totalBufferedStrokes = Math.max(0, totalBufferedStrokes - removed)
+  }
+  return removed
+}
+
 const flushStrokeBufferNow = async (reason = 'interval') => {
   if (isFlushing || totalBufferedStrokes === 0) {
     return
@@ -161,6 +171,7 @@ module.exports = {
   enqueueStroke,
   getBufferedStrokesForRoom,
   flushStrokeBufferNow,
+  clearBufferedStrokesForRoom,
   startStrokeFlushWorker,
   stopStrokeFlushWorker,
 }

@@ -123,6 +123,13 @@ function Canvas({ roomId, token, user }) {
       setRoomStatus(`Synced stroke from ${stroke.username || 'another user'}`)
     }
 
+    const handleBoardCleared = () => {
+      // when any client clears the board, wipe the canvas and local buffers
+      context.clearRect(0, 0, canvas.width, canvas.height)
+      currentStrokeRef.current = []
+      setRoomStatus('Board cleared')
+    }
+
     if (!socket.connected) {
       socket.connect()
     } else {
@@ -136,6 +143,7 @@ function Canvas({ roomId, token, user }) {
     socket.on('user:joined', handleUserJoined)
     socket.on('user:left', handleUserLeft)
     socket.on('stroke:receive', handleStrokeReceived)
+    socket.on('board:cleared', handleBoardCleared)
 
     return () => {
       socket.emit('room:leave')
@@ -146,6 +154,7 @@ function Canvas({ roomId, token, user }) {
       socket.off('user:joined', handleUserJoined)
       socket.off('user:left', handleUserLeft)
       socket.off('stroke:receive', handleStrokeReceived)
+      socket.off('board:cleared', handleBoardCleared)
     }
   }, [roomId, token, user])
 
@@ -221,8 +230,19 @@ function Canvas({ roomId, token, user }) {
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
 
+    // clear locally first for responsiveness
     context.clearRect(0, 0, canvas.width, canvas.height)
     currentStrokeRef.current = []
+
+    // notify other clients in the room
+    const socket = getWhiteboardSocket()
+    if (socket && socket.connected) {
+      socket.emit('board:clear', { roomId }, (response) => {
+        if (!response?.ok) {
+          setRoomStatus(response?.message || 'Unable to clear board')
+        }
+      })
+    }
   }
 
   const displayConnectionState = token && user ? connectionState : 'Signed out'
