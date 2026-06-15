@@ -1,16 +1,40 @@
-# React + Vite
+# Collaborative Whiteboard Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vite + React frontend for the collaborative whiteboard app.
 
-Currently, two official plugins are available:
+## Local Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Install dependencies:
 
-## React Compiler
+```powershell
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+2. Start the dev server:
 
-## Expanding the ESLint configuration
+```powershell
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Deployment
+
+This frontend is designed to run on Vercel and talk to the backend hosted on Render.
+
+Set these environment variables in Vercel for the frontend project:
+
+- `VITE_API_BASE_URL` - your backend API URL, for example `https://your-backend.onrender.com/api`
+- `VITE_SOCKET_URL` - your backend socket URL, for example `https://your-backend.onrender.com`
+
+On the Render backend, set:
+
+- `MONGO_URI`
+- `JWT_SECRET`
+- `CLIENT_ORIGIN` - your Vercel frontend URL, for example `https://your-frontend.vercel.app`
+
+The backend reads `PORT` from the hosting platform automatically, so it should not be hardcoded for Render.
+
+## Notes
+
+- The frontend code reads the API and socket URLs from `import.meta.env`.
+- If those variables are missing in production, the app will fall back to local `localhost` URLs, which will not work after deployment.
+- Keep the placeholder values in `.env.example` updated when changing hosting URLs.
