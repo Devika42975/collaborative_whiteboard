@@ -2,8 +2,9 @@ services:
   - type: web
     name: collaborative-whiteboard-backend
     env: node
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && npm start
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -23,8 +24,9 @@ services:
   - type: web
     name: collaborative-whiteboard-frontend
     env: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/dist
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
     pullRequestPreviewsEnabled: false
     envVars:
       - key: VITE_API_BASE_URL
